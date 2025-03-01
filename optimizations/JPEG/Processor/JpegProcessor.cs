@@ -14,6 +14,11 @@ public class JpegProcessor : IJpegProcessor
 	public const int CompressionQuality = 70;
 	private const int DCTSize = 8;
 
+	private JpegProcessor()
+	{
+		DCT.Initialize(DCTSize);
+	}
+
 	public void Compress(string imagePath, string compressedImagePath)
 	{
 		using var fileStream = File.OpenRead(imagePath);
@@ -65,7 +70,6 @@ public class JpegProcessor : IJpegProcessor
 
 	private static Matrix Uncompress(CompressedImage image)
 	{
-		DCT.Initialize(DCTSize);
 		var result = new Matrix(image.Height, image.Width);
 		using var allQuantizedBytes =
 			new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount));

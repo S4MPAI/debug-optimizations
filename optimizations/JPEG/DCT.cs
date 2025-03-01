@@ -8,12 +8,14 @@ public class DCT
 	private static int _size;
 	private static double[,] _cosineTable;
 	private static double[] _alphaTable;
+	private static double _beta;
 
 	public static void Initialize(int dctSize)
 	{
 		_size = dctSize;
 		_cosineTable = new double[dctSize, dctSize];
 		_alphaTable = new double[dctSize];
+		_beta = 2d / dctSize;
 		for (var x = 0; x < dctSize; x++)
 		{
 			_alphaTable[x] = x == 0 ? 0.7071067811865475 : 1;
@@ -24,22 +26,20 @@ public class DCT
 
 	public static double[,] DCT2D(double[,] input)
 	{
-		var height = input.GetLength(0);
-		var width = input.GetLength(1);
-		var coeffs = new double[width, height];
+		var coeffs = new double[_size, _size];
 
 		MathEx.LoopByTwoVariables(
-			0, width,
-			0, height,
+			0, _size,
+			0, _size,
 			(u, v) =>
 			{
 				var sum = MathEx
 					.SumByTwoVariables(
-						0, width,
-						0, height,
-						(x, y) => BasisFunction(input[x, y], u, v, x, y, height, width));
+						0, _size,
+						0, _size,
+						(x, y) => input[x, y] * _cosineTable[x, u] * _cosineTable[y, v]);
 
-				coeffs[u, v] = sum * Beta(height, width) * Alpha(u) * Alpha(v);
+				coeffs[u, v] = sum * _beta * _alphaTable[u] * _alphaTable[v];
 			});
 
 		return coeffs;
@@ -58,24 +58,8 @@ public class DCT
 						(u, v) =>
 							coeffs[u, v] * _cosineTable[x, u] * _cosineTable[y, v] * _alphaTable[u] * _alphaTable[v]);
 
-				output[x, y] = sum * Beta(_size, _size);
+				output[x, y] = sum * _beta;
 			}
 		}
-	}
-
-	public static double BasisFunction(double a, int u, int v, int x, int y, int height, int width)
-	{
-		var b = Math.Cos((x + 0.5) * u * Math.PI / width);
-		var c = Math.Cos((y + 0.5) * v * Math.PI / height);
-
-		return a * b * c;
-	}
-
-	private static double Alpha(int u) =>
-		u == 0 ? 0.7071067811865475 : 1;
-
-	private static double Beta(int height, int width)
-	{
-		return 1d / width + 1d / height;
 	}
 }
