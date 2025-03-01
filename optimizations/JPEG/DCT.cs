@@ -5,6 +5,23 @@ namespace JPEG;
 
 public class DCT
 {
+	private static int _size;
+	private static double[,] _cosineTable;
+	private static double[] _alphaTable;
+
+	public static void Initialize(int dctSize)
+	{
+		_size = dctSize;
+		_cosineTable = new double[dctSize, dctSize];
+		_alphaTable = new double[dctSize];
+		for (var x = 0; x < dctSize; x++)
+		{
+			_alphaTable[x] = x == 0 ? 0.7071067811865475 : 1;
+			for (var u = 0; u < dctSize; u++)
+				_cosineTable[x, u] = Math.Cos((x + 0.5) * u * Math.PI / dctSize);
+		}
+	}
+
 	public static double[,] DCT2D(double[,] input)
 	{
 		var height = input.GetLength(0);
@@ -30,29 +47,26 @@ public class DCT
 
 	public static void IDCT2D(double[,] coeffs, double[,] output)
 	{
-		var height = coeffs.GetLength(0);
-		var width = coeffs.GetLength(1);
-
-		for (var x = 0; x < width; x++)
+		for (var x = 0; x < _size; x++)
 		{
-			for (var y = 0; y < height; y++)
+			for (var y = 0; y < _size; y++)
 			{
 				var sum = MathEx
 					.SumByTwoVariables(
-						0, width,
-						0, height,
+						0, _size,
+						0, _size,
 						(u, v) =>
-							BasisFunction(coeffs[u, v], u, v, x, y, height, width) * Alpha(u) * Alpha(v));
+							coeffs[u, v] * _cosineTable[x, u] * _cosineTable[y, v] * _alphaTable[u] * _alphaTable[v]);
 
-				output[x, y] = sum * Beta(height, width);
+				output[x, y] = sum * Beta(_size, _size);
 			}
 		}
 	}
 
-	public static double BasisFunction(double a, double u, double v, double x, double y, int height, int width)
+	public static double BasisFunction(double a, int u, int v, int x, int y, int height, int width)
 	{
-		var b = Math.Cos(((2d * x + 1d) * u * Math.PI) / (2 * width));
-		var c = Math.Cos(((2d * y + 1d) * v * Math.PI) / (2 * height));
+		var b = Math.Cos((x + 0.5) * u * Math.PI / width);
+		var c = Math.Cos((y + 0.5) * v * Math.PI / height);
 
 		return a * b * c;
 	}
