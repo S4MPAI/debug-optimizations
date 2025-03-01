@@ -30,19 +30,21 @@ public class DCT
 
 	public static void IDCT2D(double[,] coeffs, double[,] output)
 	{
-		for (var x = 0; x < coeffs.GetLength(1); x++)
+		var height = coeffs.GetLength(0);
+		var width = coeffs.GetLength(1);
+
+		for (var x = 0; x < width; x++)
 		{
-			for (var y = 0; y < coeffs.GetLength(0); y++)
+			for (var y = 0; y < height; y++)
 			{
 				var sum = MathEx
 					.SumByTwoVariables(
-						0, coeffs.GetLength(1),
-						0, coeffs.GetLength(0),
+						0, width,
+						0, height,
 						(u, v) =>
-							BasisFunction(coeffs[u, v], u, v, x, y, coeffs.GetLength(0), coeffs.GetLength(1)) *
-							Alpha(u) * Alpha(v));
+							BasisFunction(coeffs[u, v], u, v, x, y, height, width) * Alpha(u) * Alpha(v));
 
-				output[x, y] = sum * Beta(coeffs.GetLength(0), coeffs.GetLength(1));
+				output[x, y] = sum * Beta(height, width);
 			}
 		}
 	}
@@ -55,12 +57,8 @@ public class DCT
 		return a * b * c;
 	}
 
-	private static double Alpha(int u)
-	{
-		if (u == 0)
-			return 1 / Math.Sqrt(2);
-		return 1;
-	}
+	private static double Alpha(int u) =>
+		u == 0 ? 0.7071067811865475 : 1;
 
 	private static double Beta(int height, int width)
 	{
