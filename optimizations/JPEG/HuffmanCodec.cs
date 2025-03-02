@@ -1,8 +1,6 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using JPEG.Utilities;
 
 namespace JPEG;
 
@@ -160,26 +158,28 @@ class HuffmanCodec
 	{
 		var nodes = GetNodes(frequences);
 
-		while (nodes.Count() > 1)
+		while (nodes.Count > 1)
 		{
-			var firstMin = nodes.MinOrDefault(node => node.Frequency);
-			nodes = nodes.Without(firstMin);
-			var secondMin = nodes.MinOrDefault(node => node.Frequency);
-			nodes = nodes.Without(secondMin);
-			nodes = nodes.Concat(new HuffmanNode
-					{ Frequency = firstMin.Frequency + secondMin.Frequency, Left = secondMin, Right = firstMin }
-				.ToEnumerable());
+			var firstMin = nodes.Dequeue();
+			var secondMin = nodes.Dequeue();
+			var frequency = firstMin.Frequency + secondMin.Frequency;
+			nodes.Enqueue(
+				new HuffmanNode { Frequency = frequency, Left = secondMin, Right = firstMin },
+				frequency);
 		}
 
-		return nodes.First();
+		return nodes.Dequeue();
 	}
 
-	private static IEnumerable<HuffmanNode> GetNodes(int[] frequences)
+	private static PriorityQueue<HuffmanNode, int> GetNodes(int[] frequences)
 	{
-		return Enumerable.Range(0, byte.MaxValue + 1)
-			.Select(num => new HuffmanNode { Frequency = frequences[num], LeafLabel = (byte)num })
-			.Where(node => node.Frequency > 0)
-			.ToArray();
+		var nodes = new PriorityQueue<HuffmanNode, int>();
+
+		for (var i = 0; i < 256; i++)
+			if (frequences[i] > 0)
+				nodes.Enqueue(new HuffmanNode{Frequency = frequences[i], LeafLabel = (byte)i}, frequences[i]);
+
+		return nodes;
 	}
 
 	private static int[] CalcFrequences(IEnumerable<byte> data)
