@@ -41,16 +41,18 @@ public class JpegProcessor : IJpegProcessor
 	private static CompressedImage Compress(Matrix matrix, int quality = 50)
 	{
 		var allQuantizedBytes = new List<byte>();
+		var selectors = new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr };
+		var channelFreqs = new double[DCTSize, DCTSize];
 
 		for (var y = 0; y < matrix.Height; y += DCTSize)
 		{
 			for (var x = 0; x < matrix.Width; x += DCTSize)
 			{
-				foreach (var selector in new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr })
+				foreach (var selector in selectors)
 				{
 					var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
 					ShiftMatrixValues(subMatrix, -128);
-					var channelFreqs = DCT.DCT2D(subMatrix);
+					DCT.DCT2D(subMatrix, channelFreqs);
 					var quantizedFreqs = Quantize(channelFreqs, quality);
 					var quantizedBytes = ZigZagScan(quantizedFreqs);
 					allQuantizedBytes.AddRange(quantizedBytes);
@@ -126,8 +128,8 @@ public class JpegProcessor : IJpegProcessor
 	{
 		var result = new double[yLength, xLength];
 		for (var j = 0; j < yLength; j++)
-		for (var i = 0; i < xLength; i++)
-			result[j, i] = componentSelector(matrix.Pixels[yOffset + j, xOffset + i]);
+			for (var i = 0; i < xLength; i++)
+				result[j, i] = componentSelector(matrix.Pixels[yOffset + j, xOffset + i]);
 		return result;
 	}
 
@@ -246,13 +248,9 @@ public class JpegProcessor : IJpegProcessor
 			{ 72, 92, 95, 98, 112, 100, 103, 99 }
 		};
 
-		for (int y = 0; y < result.GetLength(0); y++)
-		{
-			for (int x = 0; x < result.GetLength(1); x++)
-			{
+		for (var y = 0; y < result.GetLength(0); y++)
+			for (var x = 0; x < result.GetLength(1); x++)
 				result[y, x] = (multiplier * result[y, x] + 50) / 100;
-			}
-		}
 
 		return result;
 	}

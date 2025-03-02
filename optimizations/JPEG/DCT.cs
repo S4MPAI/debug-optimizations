@@ -27,10 +27,8 @@ public class DCT
 		}
 	}
 
-	public static double[,] DCT2D(double[,] input)
+	public static void DCT2D(double[,] input, double[,] coeffs)
 	{
-		var coeffs = new double[_size, _size];
-
 		for (var u = 0; u < _size; u++)
 		{
 			for (var y = 0; y < _size; y++)
@@ -52,8 +50,6 @@ public class DCT
 				coeffs[u, v] = sum * _beta * _alphaTable[u] * _alphaTable[v];
 			}
 		}
-
-		return coeffs;
 	}
 
 	public static void IDCT2D(double[,] coeffs, double[,] output)
