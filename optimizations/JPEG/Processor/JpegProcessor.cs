@@ -83,7 +83,7 @@ public class JpegProcessor : IJpegProcessor
 		{
 			for (var x = 0; x < image.Width; x += DCTSize)
 			{
-				Parallel.ForEach(channels, channel =>
+				foreach(var channel in channels)
 				{
 					var quantizedBytes = new byte[DCTSize * DCTSize];
 					allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
@@ -91,7 +91,7 @@ public class JpegProcessor : IJpegProcessor
 					var channelFreqs = DeQuantize(quantizedFreqs, image.Quality);
 					DCT.IDCT2D(channelFreqs, channel);
 					ShiftMatrixValues(channel, 128);
-				});
+				}
 
 				SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, y, x);
 			}
