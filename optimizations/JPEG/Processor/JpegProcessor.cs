@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using JPEG.Images;
 using PixelFormat = JPEG.Images.PixelFormat;
@@ -14,11 +16,8 @@ public class JpegProcessor : IJpegProcessor
 	public static readonly JpegProcessor Init = new();
 	public const int CompressionQuality = 70;
 	private const int DCTSize = 8;
-
-	private JpegProcessor()
-	{
-		DCT.Initialize(DCTSize);
-	}
+	private static object _lock = new();
+	private static DCT _dct = new(DCTSize);
 
 	public void Compress(string imagePath, string compressedImagePath)
 	{
@@ -40,26 +39,46 @@ public class JpegProcessor : IJpegProcessor
 
 	private static CompressedImage Compress(Matrix matrix, int quality = 50)
 	{
-		var allQuantizedBytes = new List<byte>();
+		var allQuantizedBytes = new byte[matrix.Width * matrix.Height * 3];
 		var selectors = new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr };
 		var quantizationMatrix = GetQuantizationMatrix(quality);
-		var channelFreqs = new double[DCTSize, DCTSize];
+		var blocks = new List<(int y, int x)>((matrix.Width / 8 + 1) * (matrix.Height / 8 + 1));
 
 		for (var y = 0; y < matrix.Height; y += DCTSize)
-		{
 			for (var x = 0; x < matrix.Width; x += DCTSize)
+				blocks.Add((y, x));
+
+		Parallel.ForEach(blocks, block =>
+		{
+			var channelFreqs = new double[DCTSize, DCTSize];
+			var j = 0;
+			foreach (var selector in selectors)
 			{
-				foreach (var selector in selectors)
-				{
-					var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
-					ShiftMatrixValues(subMatrix, -128);
-					DCT.DCT2D(subMatrix, channelFreqs);
-					var quantizedFreqs = Quantize(channelFreqs, quantizationMatrix);
-					var quantizedBytes = ZigZagScan(quantizedFreqs);
-					allQuantizedBytes.AddRange(quantizedBytes);
-				}
+				var subMatrix = GetSubMatrix(matrix, block.y, DCTSize, block.x, DCTSize, selector);
+				ShiftMatrixValues(subMatrix, -128);
+				_dct.DCT2D(subMatrix, channelFreqs);
+				var quantizedFreqs = Quantize(channelFreqs, quantizationMatrix);
+				var start = 3 * (block.y * matrix.Width + block.x * DCTSize) + DCTSize * DCTSize * j;
+				Array.Copy(ZigZagScan(quantizedFreqs), 0, allQuantizedBytes, start, 64);
+				j++;
 			}
-		}
+		});
+
+		// for (var y = 0; y < matrix.Height; y += DCTSize)
+		// {
+		// 	for (var x = 0; x < matrix.Width; x += DCTSize)
+		// 	{
+		// 		foreach (var selector in selectors)
+		// 		{
+		// 			var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
+		// 			ShiftMatrixValues(subMatrix, -128);
+		// 			DCT.DCT2D(subMatrix, channelFreqs);
+		// 			var quantizedFreqs = Quantize(channelFreqs, quantizationMatrix);
+		// 			var quantizedBytes = ZigZagScan(quantizedFreqs);
+		// 			allQuantizedBytes.AddRange(quantizedBytes);
+		// 		}
+		// 	}
+		// }
 
 		long bitsCount;
 		Dictionary<BitsWithLength, byte> decodeTable;
@@ -93,7 +112,7 @@ public class JpegProcessor : IJpegProcessor
 					allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
 					var quantizedFreqs = ZigZagUnScan(quantizedBytes);
 					var channelFreqs = DeQuantize(quantizedFreqs, quantizationMatrix);
-					DCT.IDCT2D(channelFreqs, channel);
+					_dct.IDCT2D(channelFreqs, channel);
 					ShiftMatrixValues(channel, 128);
 				}
 
@@ -135,7 +154,7 @@ public class JpegProcessor : IJpegProcessor
 		return result;
 	}
 
-	private static IEnumerable<byte> ZigZagScan(byte[,] channelFreqs)
+	private static byte[] ZigZagScan(byte[,] channelFreqs)
 	{
 		return new[]
 		{
@@ -201,13 +220,9 @@ public class JpegProcessor : IJpegProcessor
 	{
 		var result = new byte[channelFreqs.GetLength(0), channelFreqs.GetLength(1)];
 
-		for (int y = 0; y < channelFreqs.GetLength(0); y++)
-		{
-			for (int x = 0; x < channelFreqs.GetLength(1); x++)
-			{
+		for (var y = 0; y < channelFreqs.GetLength(0); y++)
+			for (var x = 0; x < channelFreqs.GetLength(1); x++)
 				result[y, x] = (byte)(channelFreqs[y, x] / quantizationMatrix[y, x]);
-			}
-		}
 
 		return result;
 	}

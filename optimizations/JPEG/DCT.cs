@@ -4,20 +4,16 @@ namespace JPEG;
 
 public class DCT
 {
-	private static int _size;
-	private static double[,] _cosineTable;
-	private static double[] _alphaTable;
-	private static double _beta;
-	private static double[,] DCT2DTemp;
-	private static double[,] IDCT2DTemp;
+	private readonly int _size;
+	private readonly double[,] _cosineTable;
+	private readonly double[] _alphaTable;
+	private readonly double _beta;
 
-	public static void Initialize(int dctSize)
+	public DCT(int dctSize)
 	{
 		_size = dctSize;
 		_cosineTable = new double[dctSize, dctSize];
 		_alphaTable = new double[dctSize];
-		DCT2DTemp = new double[dctSize, dctSize];
-		IDCT2DTemp = new double[dctSize, dctSize];
 		_beta = 2d / dctSize;
 		for (var x = 0; x < dctSize; x++)
 		{
@@ -27,8 +23,9 @@ public class DCT
 		}
 	}
 
-	public static void DCT2D(double[,] input, double[,] coeffs)
+	public void DCT2D(double[,] input, double[,] coeffs)
 	{
+		var dct2DTemp = new double[_size, _size];
 		for (var u = 0; u < _size; u++)
 		{
 			for (var y = 0; y < _size; y++)
@@ -36,7 +33,7 @@ public class DCT
 				var sum = 0.0;
 				for (var x = 0; x < _size; x++)
 					sum += input[x, y] * _cosineTable[x, u];
-				DCT2DTemp[y, u] = sum;
+				dct2DTemp[y, u] = sum;
 			}
 		}
 
@@ -46,14 +43,15 @@ public class DCT
 			{
 				var sum = 0.0;
 				for (var y = 0; y < _size; y++)
-					sum += DCT2DTemp[y, u] * _cosineTable[y, v];
+					sum += dct2DTemp[y, u] * _cosineTable[y, v];
 				coeffs[u, v] = sum * _beta * _alphaTable[u] * _alphaTable[v];
 			}
 		}
 	}
 
-	public static void IDCT2D(double[,] coeffs, double[,] output)
+	public void IDCT2D(double[,] coeffs, double[,] output)
 	{
+		var idct2DTemp = new double[_size, _size];
 		for (var y = 0; y < _size; y++)
 		{
 			for (var u = 0; u < _size; u++)
@@ -61,7 +59,7 @@ public class DCT
 				var sum = 0.0;
 				for (var v = 0; v < _size; v++)
 					sum += coeffs[u, v] * _cosineTable[y, v] * _alphaTable[v];
-				IDCT2DTemp[y, u] = sum * _alphaTable[u];
+				idct2DTemp[y, u] = sum * _alphaTable[u];
 			}
 		}
 
@@ -71,7 +69,7 @@ public class DCT
 			{
 				var sum = 0.0;
 				for (var u = 0; u < _size; u++)
-					sum += IDCT2DTemp[y, u] * _cosineTable[x, u];
+					sum += idct2DTemp[y, u] * _cosineTable[x, u];
 				output[x, y] = sum * _beta;
 			}
 		}
