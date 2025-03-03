@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using JPEG.Images;
-using PixelFormat = JPEG.Images.PixelFormat;
 
 namespace JPEG.Processor;
 
@@ -16,7 +14,6 @@ public class JpegProcessor : IJpegProcessor
 	public static readonly JpegProcessor Init = new();
 	public const int CompressionQuality = 70;
 	private const int DCTSize = 8;
-	private static object _lock = new();
 	private static DCT _dct = new(DCTSize);
 
 	public void Compress(string imagePath, string compressedImagePath)
@@ -64,9 +61,7 @@ public class JpegProcessor : IJpegProcessor
 			}
 		});
 
-		long bitsCount;
-		Dictionary<BitsWithLength, byte> decodeTable;
-		var compressedBytes = HuffmanCodec.Encode(allQuantizedBytes, out decodeTable, out bitsCount);
+		var compressedBytes = HuffmanCodec.Encode(allQuantizedBytes, out var decodeTable, out var bitsCount);
 
 		return new CompressedImage
 		{
@@ -114,6 +109,7 @@ public class JpegProcessor : IJpegProcessor
 		return result;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static void ShiftMatrixValues(double[,] subMatrix, int shiftValue)
 	{
 		var height = subMatrix.GetLength(0);
@@ -124,6 +120,7 @@ public class JpegProcessor : IJpegProcessor
 			subMatrix[y, x] += shiftValue;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c, int yOffset, int xOffset)
 	{
 		for (var y = 0; y < DCTSize; y++)
@@ -131,6 +128,7 @@ public class JpegProcessor : IJpegProcessor
 				matrix.SetPixel((byte)a[y, x], (byte)b[y, x], (byte)c[y, x], yOffset + y, xOffset + x);
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static void GetSubMatrix(Matrix matrix, int yOffset, int yLength, int xOffset, int xLength,
 		int component, double[,] buffer)
 	{
@@ -139,6 +137,7 @@ public class JpegProcessor : IJpegProcessor
 				buffer[j, i] = matrix.GetComponentValue(component, yOffset + j, xOffset + i);
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static byte[] ZigZagScan(byte[,] channelFreqs)
 	{
 		return new[]
@@ -162,6 +161,7 @@ public class JpegProcessor : IJpegProcessor
 		};
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static double[,] ZigZagUnScan(Span<byte> quantizedBytes)
 	{
 		return new double[,]
@@ -201,6 +201,7 @@ public class JpegProcessor : IJpegProcessor
 		};
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static byte[,] Quantize(double[,] channelFreqs, int[,] quantizationMatrix)
 	{
 		var result = new byte[channelFreqs.GetLength(0), channelFreqs.GetLength(1)];
@@ -212,6 +213,7 @@ public class JpegProcessor : IJpegProcessor
 		return result;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static void DeQuantize(double[,] bytes, int[,] quantizationMatrix)
 	{
 		var width = bytes.GetLength(0);
@@ -222,9 +224,10 @@ public class JpegProcessor : IJpegProcessor
 				bytes[y, x] = (sbyte)bytes[y, x] * quantizationMatrix[y, x]; //NOTE cast to sbyte not to loose negative numbers
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static int[,] GetQuantizationMatrix(int quality)
 	{
-		if (quality < 1 || quality > 99)
+		if (quality is < 1 or > 99)
 			throw new ArgumentException("quality must be in [1,99] interval");
 
 		var multiplier = quality < 50 ? 5000 / quality : 200 - 2 * quality;
@@ -241,8 +244,8 @@ public class JpegProcessor : IJpegProcessor
 			{ 72, 92, 95, 98, 112, 100, 103, 99 }
 		};
 
-		for (var y = 0; y < result.GetLength(0); y++)
-			for (var x = 0; x < result.GetLength(1); x++)
+		for (var y = 0; y < 8; y++)
+			for (var x = 0; x < 8; x++)
 				result[y, x] = (multiplier * result[y, x] + 50) / 100;
 
 		return result;

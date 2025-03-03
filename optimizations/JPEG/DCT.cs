@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace JPEG;
 
@@ -23,6 +24,7 @@ public class DCT
 		}
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DCT2D(double[,] input, double[,] coeffs)
 	{
 		var dct2DTemp = new double[_size, _size];
@@ -49,6 +51,7 @@ public class DCT
 		}
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void IDCT2D(double[,] coeffs, double[,] output)
 	{
 		var idct2DTemp = new double[_size, _size];
