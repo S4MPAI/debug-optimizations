@@ -1,11 +1,14 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Drawing.Imaging;
 
 namespace JPEG.Images;
 
 class Matrix
 {
-	public readonly Pixel[,] Pixels;
+	private byte[] yPlane;
+	private byte[] crPlane;
+	private byte[] cbPlane;
 	public readonly int Height;
 	public readonly int Width;
 
@@ -13,11 +16,29 @@ class Matrix
 	{
 		Height = height;
 		Width = width;
+		yPlane = new byte[Height * Width];
+		cbPlane = new byte[(width / 2) * (height / 2)];
+		crPlane = new byte[(width / 2) * (height / 2)];
+	}
 
-		Pixels = new Pixel[height, width];
-		for (var i = 0; i < height; ++i)
-		for (var j = 0; j < width; ++j)
-			Pixels[i, j] = new Pixel(0, 0, 0, PixelFormat.RGB);
+	public void SetPixel(byte component1, byte component2, byte component3, int y, int x)
+	{
+		yPlane[y * Width + x] = component1;
+		if (x % 2 != 0 || y % 2 != 0)
+			return;
+		cbPlane[(y / 2) * (Width / 2) + x / 2] = component2;
+		crPlane[(y / 2) * (Width / 2) + x / 2] = component3;
+	}
+
+	public byte GetComponentValue(int component, int y, int x)
+	{
+		return component switch
+		{
+			0 => yPlane[y * Width + x],
+			1 => cbPlane[(y / 2) * (Width / 2) + x / 2],
+			2 => crPlane[(y / 2) * (Width / 2) + x / 2],
+			_ => throw new ArgumentOutOfRangeException(nameof(component), component, null)
+		};
 	}
 
 	public static unsafe explicit operator Matrix(Bitmap bmp)
@@ -36,7 +57,23 @@ class Matrix
 			for (var x = 0; x < width; x++)
 			{
 				var offset = ptr + rowOffset + x * 3;
-				matrix.Pixels[y, x] = new Pixel(*(offset + 2), *(offset + 1), *offset, PixelFormat.RGB);
+				var r = *(offset + 2);
+				var g = *(offset + 1);
+				var b = *offset;
+
+				var _y = (byte)(0.299 * r + 0.587 * g + 0.114 * b);
+				var cb = (byte)(-0.168736*r - 0.331264*g + 0.5*b + 128);
+				var cr = (byte)(0.5 * r - 0.418688 * g - 0.081312 * b + 128);
+
+				var indexY = y * width + x;
+				matrix.yPlane[indexY] = _y;
+
+				if (x % 2 != 0 || y % 2 != 0)
+					continue;
+
+				var indexCbCr = (y / 2) * (width / 2) + (x / 2);
+				matrix.cbPlane[indexCbCr] = cb;
+				matrix.crPlane[indexCbCr] = cr;
 			}
 		}
 
@@ -58,11 +95,17 @@ class Matrix
 			var rowOffset = y * stride;
 			for (var x = 0; x < width; x++)
 			{
-				var pixel = matrix.Pixels[y, x];
+				var indexY = y * width + x;
+				var indexUV = (y / 2) * (width / 2) + x / 2;
+
+				var _y = matrix.yPlane[indexY];
+				var cb = matrix.cbPlane[indexUV];
+				var cr = matrix.crPlane[indexUV];
+
 				var offset = ptr + rowOffset + x * 3;
-				*(offset + 2) = ToByte(pixel.R);
-				*(offset + 1) = ToByte(pixel.G);
-				*offset = ToByte(pixel.B);
+				*(offset + 2) = ToByte(_y + 1.402 * (cr - 128));
+				*(offset + 1) = ToByte(_y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128));
+				*offset = ToByte(_y + 1.772 * (cb - 128));
 			}
 		}
 		bmp.UnlockBits(bmpData);

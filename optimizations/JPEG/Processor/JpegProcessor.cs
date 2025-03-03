@@ -40,7 +40,6 @@ public class JpegProcessor : IJpegProcessor
 	private static CompressedImage Compress(Matrix matrix, int quality = 50)
 	{
 		var allQuantizedBytes = new byte[matrix.Width * matrix.Height * 3];
-		var selectors = new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr };
 		var quantizationMatrix = GetQuantizationMatrix(quality);
 		var blocks = new List<(int y, int x)>((matrix.Width / 8 + 1) * (matrix.Height / 8 + 1));
 
@@ -52,9 +51,9 @@ public class JpegProcessor : IJpegProcessor
 		{
 			var channelFreqs = new double[DCTSize, DCTSize];
 			var j = 0;
-			foreach (var selector in selectors)
+			for (var i = 0; i < 3; i++)
 			{
-				var subMatrix = GetSubMatrix(matrix, block.y, DCTSize, block.x, DCTSize, selector);
+				var subMatrix = GetSubMatrix(matrix, block.y, DCTSize, block.x, DCTSize, i);
 				ShiftMatrixValues(subMatrix, -128);
 				_dct.DCT2D(subMatrix, channelFreqs);
 				var quantizedFreqs = Quantize(channelFreqs, quantizationMatrix);
@@ -106,7 +105,7 @@ public class JpegProcessor : IJpegProcessor
 				ShiftMatrixValues(channel, 128);
 				i++;
 			}
-			SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, block.y, block.x);
+			SetPixels(result, _y, cb, cr, block.y, block.x);
 		});
 
 
@@ -123,21 +122,20 @@ public class JpegProcessor : IJpegProcessor
 			subMatrix[y, x] += shiftValue;
 	}
 
-	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c, PixelFormat format,
-		int yOffset, int xOffset)
+	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c, int yOffset, int xOffset)
 	{
 		for (var y = 0; y < DCTSize; y++)
 			for (var x = 0; x < DCTSize; x++)
-				matrix.Pixels[yOffset + y, xOffset + x] = new Pixel(a[y, x], b[y, x], c[y, x], format);
+				matrix.SetPixel((byte)a[y, x], (byte)b[y, x], (byte)c[y, x], yOffset + y, xOffset + x);
 	}
 
 	private static double[,] GetSubMatrix(Matrix matrix, int yOffset, int yLength, int xOffset, int xLength,
-		Func<Pixel, double> componentSelector)
+		int component)
 	{
 		var result = new double[yLength, xLength];
 		for (var j = 0; j < yLength; j++)
 			for (var i = 0; i < xLength; i++)
-				result[j, i] = componentSelector(matrix.Pixels[yOffset + j, xOffset + i]);
+				result[j, i] = matrix.GetComponentValue(component, yOffset + j, xOffset + i);
 		return result;
 	}
 
