@@ -129,7 +129,7 @@ class HuffmanCodec
 		for (int b = 0; b < encodeTable.Length; b++)
 		{
 			var bitsWithLength = encodeTable[b];
-			if (bitsWithLength == null)
+			if (bitsWithLength.BitsCount == 0)
 				continue;
 
 			result[bitsWithLength] = (byte)b;
