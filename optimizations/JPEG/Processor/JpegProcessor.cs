@@ -33,7 +33,7 @@ public class JpegProcessor : IJpegProcessor
 	{
 		var compressedImage = CompressedImage.Load(compressedImagePath);
 		var uncompressedImage = Uncompress(compressedImage);
-		var resultBmp = (Bitmap)uncompressedImage;
+		using var resultBmp = (Bitmap)uncompressedImage;
 		resultBmp.Save(uncompressedImagePath, ImageFormat.Bmp);
 	}
 
@@ -63,22 +63,6 @@ public class JpegProcessor : IJpegProcessor
 				j++;
 			}
 		});
-
-		// for (var y = 0; y < matrix.Height; y += DCTSize)
-		// {
-		// 	for (var x = 0; x < matrix.Width; x += DCTSize)
-		// 	{
-		// 		foreach (var selector in selectors)
-		// 		{
-		// 			var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
-		// 			ShiftMatrixValues(subMatrix, -128);
-		// 			DCT.DCT2D(subMatrix, channelFreqs);
-		// 			var quantizedFreqs = Quantize(channelFreqs, quantizationMatrix);
-		// 			var quantizedBytes = ZigZagScan(quantizedFreqs);
-		// 			allQuantizedBytes.AddRange(quantizedBytes);
-		// 		}
-		// 	}
-		// }
 
 		long bitsCount;
 		Dictionary<BitsWithLength, byte> decodeTable;
